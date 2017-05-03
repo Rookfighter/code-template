@@ -134,6 +134,10 @@ def parse_arguments():
         help='search directories to look for template files',
         action='append',
         default=[])
+    parser.add_argument('-f', '--force',
+        dest='force',
+        help='Force overwriting of files if they already exist',
+        action='store_true')
 
     cfg = parser.parse_args()
 
@@ -197,7 +201,7 @@ def create_templates(cfg):
             print("Warning: no template for extension .{}".format(ext))
             continue
 
-        if os.path.exists(filepath):
+        if not cfg.force and os.path.exists(filepath):
             print("Warning: {} file exists, skipping".format(filename))
             continue
 
