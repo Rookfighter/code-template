@@ -1,11 +1,62 @@
 #!/usr/bin/python3
 
-import os.path
 import sys
+import re
 import argparse
+import getpass
+import datetime
+import subprocess
+import os.path
 
 VERSION = '0.1.0'
 HOME_DIR = os.path.expanduser("~")
+ESC_MAP = {
+    '$': r'\$'
+}
+
+
+def get_process_output(args, cwd=None):
+    proc = subprocess.Popen(args,
+        stdout=subprocess.PIPE, cwd=cwd)
+
+    return proc.stdout.read().decode('ascii')
+
+
+def get_date(cfg, filepath):
+    now = datetime.datetime.now()
+    return now.strftime('%d %b %Y')
+
+
+def get_user(cfg, filepath):
+    return getpass.getuser()
+
+
+def get_gituser(cfg, filepath):
+    path = os.path.dirname(filepath)
+    return get_process_output(['git', 'config', 'user.name'], path).strip()
+
+
+def get_gitemail(cfg, filepath):
+    path = os.path.dirname(filepath)
+    return get_process_output(['git', 'config', 'user.email'], path).strip()
+
+
+def get_filename(cfg, filepath):
+    return os.path.basename(filepath)
+
+
+def get_filepath(cfg, filepath):
+    return filepath
+
+
+VAR_FUNCS = {
+    'date': get_date,
+    'user': get_user,
+    'gituser': get_gituser,
+    'gitemail': get_gitemail,
+    'filename': get_filename,
+    'filepath': get_filepath
+}
 
 
 def map_ext2file(arglist):
@@ -22,13 +73,42 @@ def map_ext2file(arglist):
     return result
 
 
+def opts_from_file(filename):
+    result = []
+    with open(filename) as f:
+        linenr = 0
+        for line in f.readlines():
+            linenr += 1
+
+            line = line.strip()
+            # check if line is empty or is a comment
+            if len(line) == 0 or line[0] == '#':
+                continue
+
+            opts = [line]
+            # find separating space
+            idx = line.find(' ')
+            if idx > 0:
+                opts = [line[:idx].strip(), line[idx:].strip()]
+
+            if opts[0][0] != '-':
+                if len(opts[0]) == 1:
+                    opts[0] = '-' + opts[0]
+                else:
+                    opts[0] = '--' + opts[0]
+
+            result.extend(opts)
+
+    return result
+
+
 def parse_arguments():
     global_cfg = os.path.join(HOME_DIR, '.codetemplrc')
 
     parser = argparse.ArgumentParser(prog='codetempl',
-        description='Generate code files from templates.',
-        fromfile_prefix_chars='@')
-    parser.add_argument('files', help='files to create', nargs='+')
+        description='Generate code files from templates.')
+    parser.add_argument('files', nargs='+',
+        help='files to create')
     parser.add_argument('--config', help='read configuration from file')
     parser.add_argument('-v', '--version', help='shows version number',
         action='version',
@@ -38,64 +118,106 @@ def parse_arguments():
         help='Escape character for template variables',
         default='$')
     parser.add_argument('--map-ext',
-        nargs='*',
         dest='map_ext',
         help='map extension to certain template files',
         action='append',
         default=[])
     parser.add_argument('--search-dir',
-        nargs='*',
         dest='search_dir',
         help='search directories to look for template files',
         action='append',
         default=[])
 
-    myargs = sys.argv
+    cfg = parser.parse_args()
+
+    # args that will be used for the final parsing
+    myargs = sys.argv[1:]
+    # check if there was a config file specified
+    if cfg.config is not None:
+        myargs = opts_from_file(cfg.config) + myargs
+    # check if there is a global config file
     if os.path.exists(global_cfg):
-        myargs = myargs + ['@' + global_cfg]
+        myargs = opts_from_file(global_cfg) + myargs
 
+    # parse arguments
     cfg = parser.parse_args(myargs)
-    if(cfg.config is not None):
-        myargs = myargs + ['@' + cfg.config]
-        cfg = parser.parse_args(myargs)
-
+    # parse the file extension mapping
     cfg.map_ext = map_ext2file(cfg.map_ext)
 
     return cfg
 
 
-def replace_macros(content, cfg):
-    pass
+def get_esc(cfg):
+    if cfg.esc in ESC_MAP:
+        return ESC_MAP[cfg.esc]
+    else:
+        return cfg.esc
+
+
+def replace_vars(content, cfg, filepath):
+    # regex for alphanumeric identfiers starting with esc character
+    prog = re.compile(r'{}(\w+)'.format(get_esc(cfg)))
+    result = content
+
+    # start matching all variables
+    m = prog.search(result)
+    while m is not None:
+        var = m.group(1)
+        varlow = var.lower()
+
+        val = ''
+        # check if we have a function for the variable
+        if varlow not in VAR_FUNCS:
+            print('Warning: unknown variable {}'.format(var))
+        else:
+            val = VAR_FUNCS[varlow](cfg, filepath)
+
+        result = result[:m.start()] + val + result[m.end():]
+        m = prog.search(result, m.start())
+
+    return result
 
 
 def create_templates(cfg):
-    for filename in cfg.files:
+    for filepath in cfg.files:
+        filepath = os.path.abspath(filepath)
+        filename = os.path.basename(filepath)
         ext = os.path.splitext(filename)[1]
+        if ext[0] == '.':
+            ext = ext[1:]
 
         if ext not in cfg.map_ext:
             print("Warning: no template for extension .{}".format(ext))
             continue
 
         templ_name = cfg.map_ext[ext]
-        templ_path = None
+        templ_path = ''
 
+        # find correct dir for the matching template file
         for templ_dir in cfg.search_dir:
+            templ_dir = os.path.abspath(templ_dir)
             templ_path = os.path.join(templ_dir, templ_name)
             if os.path.exists(templ_path):
                 break
 
+        # check if we found a suitable template path
         if not os.path.exists(templ_path):
             print('Warning: no path found for {}'.format(templ_name))
             continue
 
+        # read the content from the template file
         templ_content = ''
         with open(templ_path, 'r') as f:
             templ_content = f.read()
 
-        templ_content = replace_macros(templ_content)
+        # replace variables given in template
+        templ_content = replace_vars(templ_content, cfg, filepath)
 
-        with open(filename, 'w') as f:
+        # write the new file
+        with open(filepath, 'w') as f:
             f.write(templ_content)
+
+        print('[OK] {}'.format(filename))
 
 
 if __name__ == '__main__':
