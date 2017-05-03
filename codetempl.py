@@ -1,5 +1,12 @@
 #!/usr/bin/python3
 
+'''
+codetempl.py
+
+Created on: 28 Apr 2017
+    Author: Fabian Meyer
+'''
+
 import sys
 import re
 import argparse
