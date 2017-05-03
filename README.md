@@ -47,9 +47,24 @@ consideration.
 * ```filename``` filename of currently created file
 * ```filepath``` absolute filepath of currently created file
 
+A template file for Python might look like this:
+
+```python
+'''
+$filename
+
+Created on: $date
+    Author: $gituser
+'''
+
+```
+
 ## TODO
 
-[ ] add more variables: c/cpp guard blocks, cpp namespaces, class names
-[ ] add user defined variables
-[ ] make date format customizable
-[ ] make guard block format customizable
+* [ ] add more variables
+  * [ ] c/cpp guard blocks
+  * [ ] cpp namespaces
+  * [ ] class names
+* [ ] add user defined variables
+* [ ] make date format customizable
+* [ ] make guard block format customizable
