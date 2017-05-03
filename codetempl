@@ -122,21 +122,21 @@ def parse_arguments():
         version=('codetempl Version ' + VERSION))
     parser.add_argument('--esc-char',
         dest='esc',
-        help='Escape character for template variables',
+        help='escape character for template variables',
         default='$')
     parser.add_argument('--map-ext',
         dest='map_ext',
-        help='map extension to certain template files',
+        help='map file extension to template files',
         action='append',
         default=[])
     parser.add_argument('--search-dir',
         dest='search_dir',
-        help='search directories to look for template files',
+        help='search directories for template files',
         action='append',
         default=[])
     parser.add_argument('-f', '--force',
         dest='force',
-        help='Force overwriting of files if they already exist',
+        help='force overwrite of files',
         action='store_true')
 
     cfg = parser.parse_args()
