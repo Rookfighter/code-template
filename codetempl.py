@@ -197,6 +197,10 @@ def create_templates(cfg):
             print("Warning: no template for extension .{}".format(ext))
             continue
 
+        if os.path.exists(filepath):
+            print("Warning: {} file exists, skipping".format(filename))
+            continue
+
         templ_name = cfg.map_ext[ext]
         templ_path = ''
 
