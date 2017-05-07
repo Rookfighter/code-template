@@ -69,4 +69,4 @@ A template file for a C header file might look like this:
 #endif
 ```
 
-For more examples on template files see the ```samples``` directory.
+For more examples on template files see the ```templates``` directory.
