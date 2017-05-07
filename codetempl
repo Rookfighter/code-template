@@ -63,15 +63,17 @@ def get_guard(cfg, filepath, param):
     name = os.path.basename(filepath)
     name, ext = os.path.splitext(name)
     ext = ext.replace('.', '')
-    base = os.path.dirname(filepath)
+
+    regexalphanum = re.compile('[^\w]+')
+
+    basedir = os.path.dirname(filepath)
     result = ['', ext, name]
     for i in range(lvl):
-        el = os.path.basename(base)
-        el = el.replace('-', '_')
-        el = el.replace(':', '')
-        el = el.replace('.', '')
-        result.append(el)
-        base = os.path.dirname(filepath)
+        basedir, subdir = os.path.split(basedir)
+        subdir = regexalphanum.sub('', subdir)
+        result.append(subdir)
+
+    # reverse list and concatenate elements
     result.reverse()
     result = '_'.join(result).upper()
     return result
