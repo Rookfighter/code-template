@@ -21,6 +21,7 @@ HOME_DIR = os.path.expanduser("~")
 ESC_MAP = {
     '$': r'\$'
 }
+VAR_USER = {}
 
 
 def get_process_output(args, cwd=None):
@@ -51,7 +52,6 @@ def get_gitemail(cfg, filepath, param):
 
 
 def get_filename(cfg, filepath, param):
-    print(param)
     return os.path.basename(filepath)
 
 
@@ -91,7 +91,7 @@ VAR_FUNCS = {
 }
 
 
-def map_ext2file(arglist):
+def map_by_colon(arglist):
     result = {}
 
     for arg in arglist:
@@ -159,6 +159,11 @@ def parse_arguments():
         help='search directories for template files',
         action='append',
         default=[])
+    parser.add_argument('--user-var',
+        dest='user_var',
+        help='user defined variables',
+        action='append',
+        default=[])
     parser.add_argument('-f', '--force',
         dest='force',
         help='force overwrite of files',
@@ -177,8 +182,15 @@ def parse_arguments():
 
     # parse arguments
     cfg = parser.parse_args(myargs)
+
     # parse the file extension mapping
-    cfg.map_ext = map_ext2file(cfg.map_ext)
+    cfg.map_ext = map_by_colon(cfg.map_ext)
+
+    # parse user defined variables
+    global VAR_USER
+    tmp = map_by_colon(cfg.user_var)
+    for k, v in tmp.items():
+        VAR_USER[k.lower()] = v
 
     return cfg
 
@@ -207,9 +219,7 @@ def replace_vars(content, cfg, filepath):
         start = m.start()
         end = m.end()
         # check if we have a function for the variable
-        if varlow not in VAR_FUNCS:
-            print('Warning: unknown variable {}'.format(var))
-        else:
+        if varlow in VAR_FUNCS:
             param = {}
             if result[m.end()] == '{':
                 m2 = regexparam.search(result, m.end())
@@ -217,6 +227,11 @@ def replace_vars(content, cfg, filepath):
                     param = json.loads(m2.group(1))
                     end = m2.end()
             val = VAR_FUNCS[varlow](cfg, filepath, param)
+        elif varlow in VAR_USER:
+            val = VAR_USER[varlow]
+        else:
+            print('Warning: unknown variable {}'.format(var))
+            val = '<unknown>'
 
         result = result[:start] + val + result[end:]
         m = regexvar.search(result, m.start())
