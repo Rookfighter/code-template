@@ -6,5 +6,5 @@ setup(name='codetempl',
     author='Fabian Meyer',
     author_email='user8324@posteo.net',
     scripts=['codetempl'],
-    requires=['argparse', 'getpass', 'subprocess'],
+    requires=['argparse', 'getpass', 'subprocess', 'json'],
     license='GPLv3')
