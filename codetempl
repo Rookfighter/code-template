@@ -31,8 +31,9 @@ def get_process_output(args, cwd=None):
 
 
 def get_date(cfg, filepath, param):
+    fmt = '%d %b %Y' if 'fmt' not in param else param['fmt']
     now = datetime.datetime.now()
-    return now.strftime('%d %b %Y')
+    return now.strftime(fmt)
 
 
 def get_user(cfg, filepath, param):
