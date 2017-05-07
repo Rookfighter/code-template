@@ -21,7 +21,7 @@ important options are described in the following table.
 | ```--map-ext <ext:template-file>``` | Add a extension to template file mapping. ```codetempl``` selects a template file depending on the extension of the file that will be created. ```codetempl``` searches in the defined search directories for the template file. |
 | ```--config <cfg-file>```           | Load command line parameters from the specified file. ```codetempl``` will also automatically look for a ```.codetemplrc``` in your home directory. |
 | ```-f```                            | Force overwrite for existing files. Otherwise existing files will be skipped. |
-| ```--user-var <var:value>```        | Define value for a variable. The variable ```var``` will the be replaced with the content for ```value```. |
+| ```--user-var <var:value>```        | Define value for a variable. The variable ```var``` will be replaced with the content of ```value```. |
 
 A config file might look like this:
 
@@ -70,3 +70,12 @@ A template file for a C header file might look like this:
 ```
 
 For more examples on template files see the ```templates``` directory.
+
+## Example
+
+You can create a new C++ class with the sample template files by executing
+the following:
+
+```
+codetempl --user-var "class:MyClass" --user-var "namespace:MyNamespace" MyClass.hpp MyClass.cpp
+```
