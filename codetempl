@@ -13,6 +13,7 @@ import argparse
 import getpass
 import datetime
 import subprocess
+import json
 import os.path
 
 VERSION = '0.1.0'
@@ -29,31 +30,51 @@ def get_process_output(args, cwd=None):
     return proc.stdout.read().decode('ascii')
 
 
-def get_date(cfg, filepath):
+def get_date(cfg, filepath, param):
     now = datetime.datetime.now()
     return now.strftime('%d %b %Y')
 
 
-def get_user(cfg, filepath):
+def get_user(cfg, filepath, param):
     return getpass.getuser()
 
 
-def get_gituser(cfg, filepath):
+def get_gituser(cfg, filepath, param):
     path = os.path.dirname(filepath)
     return get_process_output(['git', 'config', 'user.name'], path).strip()
 
 
-def get_gitemail(cfg, filepath):
+def get_gitemail(cfg, filepath, param):
     path = os.path.dirname(filepath)
     return get_process_output(['git', 'config', 'user.email'], path).strip()
 
 
-def get_filename(cfg, filepath):
+def get_filename(cfg, filepath, param):
+    print(param)
     return os.path.basename(filepath)
 
 
-def get_filepath(cfg, filepath):
+def get_filepath(cfg, filepath, param):
     return filepath
+
+
+def get_guard(cfg, filepath, param):
+    lvl = 0 if 'lvl' not in param else param['lvl']
+    name = os.path.basename(filepath)
+    name, ext = os.path.splitext(name)
+    ext = ext.replace('.', '')
+    base = os.path.dirname(filepath)
+    result = ['', ext, name]
+    for i in range(lvl):
+        el = os.path.basename(base)
+        el = el.replace('-', '_')
+        el = el.replace(':', '')
+        el = el.replace('.', '')
+        result.append(el)
+        base = os.path.dirname(filepath)
+    result.reverse()
+    result = '_'.join(result).upper()
+    return result
 
 
 VAR_FUNCS = {
@@ -62,7 +83,8 @@ VAR_FUNCS = {
     'gituser': get_gituser,
     'gitemail': get_gitemail,
     'filename': get_filename,
-    'filepath': get_filepath
+    'filepath': get_filepath,
+    'guard': get_guard
 }
 
 
@@ -167,24 +189,34 @@ def get_esc(cfg):
 
 def replace_vars(content, cfg, filepath):
     # regex for alphanumeric identfiers starting with esc character
-    prog = re.compile(r'{}(\w+)'.format(get_esc(cfg)))
+    regexvar = re.compile(r'{}(\w+)'.format(get_esc(cfg)))
+    regexparam = re.compile(r'(\{[^\v\}]*\})')
     result = content
 
     # start matching all variables
-    m = prog.search(result)
+    m = regexvar.search(result)
     while m is not None:
         var = m.group(1)
         varlow = var.lower()
 
         val = ''
+
+        start = m.start()
+        end = m.end()
         # check if we have a function for the variable
         if varlow not in VAR_FUNCS:
             print('Warning: unknown variable {}'.format(var))
         else:
-            val = VAR_FUNCS[varlow](cfg, filepath)
+            param = {}
+            if result[m.end()] == '{':
+                m2 = regexparam.search(result, m.end())
+                if m2 is not None:
+                    param = json.loads(m2.group(1))
+                    end = m2.end()
+            val = VAR_FUNCS[varlow](cfg, filepath, param)
 
-        result = result[:m.start()] + val + result[m.end():]
-        m = prog.search(result, m.start())
+        result = result[:start] + val + result[end:]
+        m = regexvar.search(result, m.start())
 
     return result
 
