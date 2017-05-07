@@ -21,6 +21,7 @@ important options are described in the following table.
 | ```--map-ext <ext:template-file>``` | Add a extension to template file mapping. ```codetempl``` selects a template file depending on the extension of the file that will be created. ```codetempl``` searches in the defined search directories for the template file. |
 | ```--config <cfg-file>```           | Load command line parameters from the specified file. ```codetempl``` will also automatically look for a ```.codetemplrc``` in your home directory. |
 | ```-f```                            | Force overwrite for existing files. Otherwise existing files will be skipped. |
+| ```--user-var <var:value>```        | Define value for a variable. The variable ```var``` will the be replaced with the content for ```value```. |
 
 A config file might look like this:
 
@@ -40,6 +41,7 @@ In this case if a new .cpp file is created ```codetempl``` will look in
 
 There are multiple predefined variables which can be specified in a template
 file with a leading ```$```. These will be replaced on creation of a new file.
+It is also possible to define variables as command line argument.
 
 | Variable       | Description                       | Options                 |
 |----------------|-----------------------------------|-------------------------|
