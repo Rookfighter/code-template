@@ -17,11 +17,14 @@ important options are described in the following table.
 
 | Parameter                           | Description                                   |
 |-------------------------------------|-----------------------------------------------|
-| ```--search-dir <dir>```            | Add a search directory where ```codetempl``` looks for template files. |
-| ```--map-ext <ext:template-file>``` | Add a extension to template file mapping. ```codetempl``` selects a template file depending on the extension of the file that will be created. ```codetempl``` searches in the defined search directories for the template file. |
-| ```--config <cfg-file>```           | Load command line parameters from the specified file. ```codetempl``` will also automatically look for a ```.codetemplrc``` in your home directory. |
-| ```-f```                            | Force overwrite for existing files. Otherwise existing files will be skipped. |
-| ```--user-var <var:value>```        | Define value for a variable. The variable ```var``` will be replaced with the content of ```value```. |
+| ```--search-dir <dir>```          | Add a search directory where ```codetempl``` looks for template files. |
+| ```--map-ext <ext:template-file>``` | Add an extension to template file mapping. ```codetempl``` selects a template file depending on the extension of the file that will be created. ```codetempl``` searches in the defined search directories for the template file. |
+| ```--esc-char <char>```           | Escape character for template variables and control blocks (default ```$```). |
+| ```--config <cfg-file>```         | Load command line parameters from the specified file. ```codetempl``` will also automatically look for a ```.codetemplrc``` in your home directory. |
+| ```-v```, ```--version```         | Shows version number. |
+| ```-f```, ```--force```           | Force overwrite for existing files. Otherwise existing files will be skipped. |
+| ```--user-var <var:value>```     | Define value for a variable. The variable ```var``` will be replaced with the content of ```value```. |
+| ```--vars-json <json-file>```    | Load variables from a file in JSON format. This parameter might be combined with the ```--user-var``` parameter. |
 
 A config file might look like this:
 
@@ -37,11 +40,18 @@ map-ext h:template.h
 In this case if a new .cpp file is created ```codetempl``` will look in
 ```/home/user/Templates``` for a template file called ```template.cpp```.
 
-### template variables
+### Template variables
 
 There are multiple predefined variables which can be specified in a template
 file with a leading ```$```. These will be replaced on creation of a new file.
-It is also possible to define variables as command line argument.
+It is also possible to define variables as command line argument. The names of
+variables start with the character after the leading ```$``` and include every
+subsequent character in the set ```[a-zA-Z0-9_]``` until a character not included
+in this set is reached. ```$``` can be used to terminate a veriable name
+(especially if the variable occurs within a string, e.g. ```A$FOO$String``` where
+the variable ```FOO``` might be replaced). The leading as well as the optional
+terminating ```$``` will be removed upon replacement. Variable names are not case-
+sensitive!
 
 | Variable       | Description                       | Options                 |
 |----------------|-----------------------------------|-------------------------|
@@ -70,6 +80,72 @@ A template file for a C header file might look like this:
 ```
 
 For more examples on template files see the ```templates``` directory.
+
+### Loops
+Lists assigned to variables (like ```"Libs": ["foo.lib", "bar.lib"]``` in a
+JSON file) might be expanded using foreach loops. A template
+
+```c
+$$foreach($Libs)
+#pragma comment(lib, "Lib/$Libs")
+$$endfor
+```
+
+will result in a form where the block within the foreach loop is reproduced
+for every element of the list given in parentheses after the ```$$foreach```
+statement:
+
+```c
+#pragma comment(lib, "Lib/foo.lib")
+#pragma comment(lib, "Lib/bar.lib")
+```
+
+### Conditions
+Code blocks in template files might be embedded in condition blocks to make them
+appear in the files created from that templates only if certain conditions are met
+or are *not* met. The syntax works as follows:
+
+```
+$$if(CONDITION)
+[Code to be reproduced only if CONDITION is met]
+$$else
+[Code to be reproduced only if CONDITION is NOT met]
+$$endif
+```
+
+All variables appearing in *CONDITION* will be replaced by a boolean value by casting
+their definitions into a boolean type. Noteworthy, empty lists and empty strings will
+evaluate to ```False``` according to the Python rules. Variables which do not exist
+will be replaced by ```False``` as well. After all replacements, the final condition
+will be evaluated by Python's ```eval()``` function. Doing so, Python's logical
+operators are allowed in the condition statement to construct more complex conditions
+by combining multiple variables.
+
+#### Example
+Given the following variable definitions as a JSON file
+```json
+{
+  "Libs": [],
+  "Flag": true,
+}
+```
+the following template
+```c
+$$if($Libs and $Flag)
+std::cout << "Libs is not empty and Flag is true."
+$$else
+std::cout << "Libs is empty or Flag is false."
+$$endif
+```
+will be evaluated to
+```c
+std::cout << "Libs is empty or Flag is false."
+```
+
+### Evaluation order
+Conditions are evaluated firstly, loops secondly and normal variables thirdly. Thus,
+it is possible to use normal variables within loops and to use normal variables as
+well as loops within condition blocks.
 
 ## Example
 

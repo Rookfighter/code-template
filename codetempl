@@ -4,7 +4,7 @@
 codetempl.py
 
 Created on: 28 Apr 2017
-    Author: Fabian Meyer
+    Author: Fabian Meyer, Julian Bopp
 '''
 
 import sys
@@ -16,7 +16,7 @@ import subprocess
 import json
 import os.path
 
-VERSION = '0.2.0'
+VERSION = '0.3.0'
 HOME_DIR = os.path.expanduser("~")
 ESC_MAP = {
     '$': r'\$'
@@ -164,6 +164,10 @@ def parse_arguments():
         help='user defined variables',
         action='append',
         default=[])
+    parser.add_argument('--vars-json',
+        dest='vars_json',
+        help='user defined variables to be loaded from a JSON file',
+        default='')
     parser.add_argument('-f', '--force',
         dest='force',
         help='force overwrite of files',
@@ -192,7 +196,23 @@ def parse_arguments():
     for k, v in tmp.items():
         VAR_USER[k.lower()] = v
 
+    # load user defined variables from a JSON file
+    if cfg.vars_json is not '':
+        VAR_USER = {**VAR_USER, **load_user_vars_from_json(cfg.vars_json)}
+
     return cfg
+
+
+def load_user_vars_from_json(file):
+    vars = {}
+
+    with open(file) as json_file: 
+        vars = json.load(json_file)
+        
+    # all keys to lowercase
+    vars = dict((k.lower(), v) for k, v in vars.items())
+
+    return vars
 
 
 def get_esc(cfg):
@@ -201,10 +221,64 @@ def get_esc(cfg):
     else:
         return cfg.esc
 
+    
+def replace_conditions(content, cfg, filepath):
+    regexcond = re.compile(r'{0}{0}if\s*\((.*?)\)\s*^(.*?)(?:{0}{0}else\s*^(.*?))?{0}{0}endif\s?'.format(get_esc(cfg)), re.MULTILINE | re.DOTALL)
+    result = content
 
-def replace_vars(content, cfg, filepath):
+    # start matching all conditions if(cond)...[else...]endif
+    m = regexcond.search(result)
+    while m is not None:
+        parsed_cond = replace_vars(m.group(1), cfg, filepath, True)
+        val = m.group(2) if eval(parsed_cond) else (m.group(3) if m.group(3) is not None else '')
+
+        result = integrate_block(result, val, m.start(), m.end())
+        m = regexcond.search(result, m.start())
+
+    return result
+
+    
+def replace_loops(content, cfg, filepath):
+    esc = get_esc(cfg)
+    regexfor = re.compile(r'{0}{0}foreach\s*\(\s*{0}(\w+){0}?\s*\)\s*^(.*?){0}{0}endfor\s?'.format(esc), re.MULTILINE | re.DOTALL)
+    result = content
+
+    # start matching all loops foreach(list)...endfor
+    m = regexfor.search(result)
+    while m is not None:
+        var = m.group(1)
+        varlow = var.lower()
+        val = '<foreach failed>'
+
+        if varlow not in VAR_USER:
+            print('Warning: unknown variable {}'.format(var))
+        elif not isinstance(VAR_USER[varlow], list):
+            print('Warning: variable {} is not a list'.format(var))
+        else:
+            val = ''
+
+            for element in VAR_USER[varlow]:
+                val = val + re.sub(r'{0}{1}{0}?'.format(esc, varlow), element, m.group(2), flags = re.IGNORECASE)
+        
+        result = integrate_block(result, val, m.start(), m.end())
+        m = regexfor.search(result, m.start())
+
+    return result
+
+
+# in case of empty pattern: remove surplus newline(s) in text
+def integrate_block(text, pattern, start, end):
+    if pattern == '' and start >= 2 and text[start - 1] == '\n' and text[start - 2] == '\n' and text[end] == '\n':
+        text = text[:start - 1] + text[end:]
+    else:
+        text = text[:start] + pattern + text[end:]
+
+    return text;
+
+
+def replace_vars(content, cfg, filepath, make_boolean_evaluable = False):
     # regex for alphanumeric identfiers starting with esc character
-    regexvar = re.compile(r'{}(\w+)'.format(get_esc(cfg)))
+    regexvar = re.compile(r'{0}(\w+){0}?'.format(get_esc(cfg)))
     regexparam = re.compile(r'(\{[^\v\}]*\})')
     result = content
 
@@ -219,7 +293,7 @@ def replace_vars(content, cfg, filepath):
         start = m.start()
         end = m.end()
         # check if we have a function for the variable
-        if varlow in VAR_FUNCS:
+        if varlow in VAR_FUNCS and make_boolean_evaluable is not True:
             param = {}
             if result[m.end()] == '{':
                 m2 = regexparam.search(result, m.end())
@@ -228,10 +302,16 @@ def replace_vars(content, cfg, filepath):
                     end = m2.end()
             val = VAR_FUNCS[varlow](cfg, filepath, param)
         elif varlow in VAR_USER:
-            val = VAR_USER[varlow]
+            if make_boolean_evaluable:
+                val = ' True ' if VAR_USER[varlow] else ' False '
+            else:
+                val = VAR_USER[varlow]
         else:
-            print('Warning: unknown variable {}'.format(var))
-            val = '<unknown>'
+            if make_boolean_evaluable:
+                val = ' False '
+            else:
+                print('Warning: unknown variable {}'.format(var))
+                val = '<unknown>'
 
         result = result[:start] + val + result[end:]
         m = regexvar.search(result, m.start())
@@ -274,6 +354,12 @@ def create_templates(cfg):
         templ_content = ''
         with open(templ_path, 'r') as f:
             templ_content = f.read()
+
+        # replace if...else conditions
+        templ_content = replace_conditions(templ_content, cfg, filepath)
+
+        # replace foreach loops
+        templ_content = replace_loops(templ_content, cfg, filepath)
 
         # replace variables given in template
         templ_content = replace_vars(templ_content, cfg, filepath)
