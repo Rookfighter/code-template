@@ -16,12 +16,13 @@ import subprocess
 import json
 import os.path
 
-VERSION = '0.3.0'
+VERSION = '0.3.1'
 HOME_DIR = os.path.expanduser("~")
 ESC_MAP = {
     '$': r'\$'
 }
 VAR_USER = {}
+KEYWORDS = ['if', 'else', 'endif', 'foreach', 'endfor']
 
 
 def get_process_output(args, cwd=None):
@@ -172,6 +173,10 @@ def parse_arguments():
         dest='force',
         help='force overwrite of files',
         action='store_true')
+    parser.add_argument('-i', '--investigate',
+        dest='investigate',
+        help='list variables occurring in specified template files',
+        action='store_true')
 
     cfg = parser.parse_args()
 
@@ -319,6 +324,57 @@ def replace_vars(content, cfg, filepath, make_boolean_evaluable = False):
     return result
 
 
+def investigate_templates(cfg):
+    esc = get_esc(cfg)
+    regex_all_lists = re.compile(r'{0}{0}foreach\s*\(\s*{0}(\w+){0}?\s*\)\s*^.*?{0}{0}endfor\s?'.format(esc), re.MULTILINE | re.DOTALL)
+    regex_all_strings = re.compile(r'["\'][\S ]*?(?<!{0}){0}(\w+){0}?[\S ]*["\']'.format(esc))
+    regex_all_bools = re.compile(r'{0}{0}if\s*\(\s*{0}(\w+){0}?\s*\)\s*^.*?{0}{0}endif\s?'.format(esc), re.MULTILINE | re.DOTALL)
+    regex_all_vars = re.compile(r'{0}(\w+){0}?'.format(esc))
+
+    vars = dict()
+    for filepath in cfg.files:
+        # check if file exists and read its contents
+        if not os.path.exists(filepath):
+            print('Warning: template file {} does not exist, skipping'.format(filepath))
+            continue
+
+        templ_content = ''
+        with open(filepath, 'r') as f:
+            templ_content = f.read()
+
+        # Find different variable types and priorize matches in order list > string > bool > unknown ("?")
+        # since lists and strings can be evaluated in conditions. Thus, bool is the more general type.
+        matches = regex_all_lists.findall(templ_content)
+        for match in matches:
+            vars[match] = list()
+
+        matches = regex_all_strings.findall(templ_content)
+        for match in matches:
+            if match not in vars or not isinstance(vars[match], list):
+                vars[match] = ''
+
+        matches = regex_all_bools.findall(templ_content)
+        for match in matches:
+            if match not in vars or (isinstance(vars[match], str) and vars[match] is '?'):
+                vars[match] = False
+
+        matches = regex_all_vars.findall(templ_content)
+        for match in matches:
+            if match not in vars:
+                vars[match] = '?'
+
+    # remove keywords and functions
+    for k in KEYWORDS:
+        if k in vars:
+            del vars[k]
+    for f in VAR_FUNCS:
+        if f in vars:
+            del vars[f]
+
+    json_str = json.dumps(vars, sort_keys=True, indent=4)
+    print(json_str)
+
+
 def create_templates(cfg):
     for filepath in cfg.files:
         filepath = os.path.abspath(filepath)
@@ -373,4 +429,8 @@ def create_templates(cfg):
 
 if __name__ == '__main__':
     cfg = parse_arguments()
-    create_templates(cfg)
+
+    if cfg.investigate:
+        investigate_templates(cfg)
+    else:
+        create_templates(cfg)
