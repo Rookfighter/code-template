@@ -23,7 +23,7 @@ important options are described in the following table.
 | ```--config <cfg-file>```         | Load command line parameters from the specified file. ```codetempl``` will also automatically look for a ```.codetemplrc``` in your home directory. |
 | ```-v```, ```--version```         | Shows version number. |
 | ```-f```, ```--force```           | Force overwrite for existing files. Otherwise existing files will be skipped. |
-| ```-i <files>```, ```--investigate <files>``` | Print variables occurring in the specified template files in JSON format. Also attempts to determine the variables' types (list ```[]```, string ```""```, boolean ```false```, unknown ```"?"```). Parameters related to code generation will be ignored if this flag is specified. |
+| ```-e <files>```, ```--extract-vars-json <files>``` | Print variables occurring in the specified template files in JSON format. Also attempts to determine the variables' types (list ```[]```, string ```""```, boolean ```false```, unknown ```"?"```). Parameters related to code generation will be ignored if this flag is specified. |
 | ```--user-var <var:value>```     | Define value for a variable. The variable ```var``` will be replaced with the content of ```value```. |
 | ```--vars-json <json-file>```    | Load variables from a file in JSON format. This parameter might be combined with the ```--user-var``` parameter. |
 

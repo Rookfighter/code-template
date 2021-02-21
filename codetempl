@@ -173,8 +173,8 @@ def parse_arguments():
         dest='force',
         help='force overwrite of files',
         action='store_true')
-    parser.add_argument('-i', '--investigate',
-        dest='investigate',
+    parser.add_argument('-e', '--extract-vars-json',
+        dest='extract_vars_json',
         help='list variables occurring in specified template files',
         action='store_true')
 
@@ -324,7 +324,7 @@ def replace_vars(content, cfg, filepath, make_boolean_evaluable = False):
     return result
 
 
-def investigate_templates(cfg):
+def extract_vars_from_templates(cfg):
     esc = get_esc(cfg)
     regex_all_lists = re.compile(r'{0}{0}foreach\s*\(\s*{0}(\w+){0}?\s*\)\s*^.*?{0}{0}endfor\s?'.format(esc), re.MULTILINE | re.DOTALL)
     regex_all_strings = re.compile(r'["\'][\S ]*?(?<!{0}){0}(\w+){0}?[\S ]*["\']'.format(esc))
@@ -430,7 +430,7 @@ def create_templates(cfg):
 if __name__ == '__main__':
     cfg = parse_arguments()
 
-    if cfg.investigate:
-        investigate_templates(cfg)
+    if cfg.extract_vars_json:
+        extract_vars_from_templates(cfg)
     else:
         create_templates(cfg)
