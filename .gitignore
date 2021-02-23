@@ -12,5 +12,9 @@ pip-delete-this-directory.txt
 .pydevproject
 .idea
 
+# Visual Studio
+.vs/
+
 # others
 build/
+env/
