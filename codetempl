@@ -202,7 +202,7 @@ def parse_arguments():
         VAR_USER[k.lower()] = v
 
     # load user defined variables from a JSON file
-    if cfg.vars_json is not '':
+    if cfg.vars_json != '':
         VAR_USER = {**VAR_USER, **load_user_vars_from_json(cfg.vars_json)}
 
     return cfg
@@ -355,7 +355,7 @@ def extract_vars_from_templates(cfg):
 
         matches = regex_all_bools.findall(templ_content)
         for match in matches:
-            if match not in vars or (isinstance(vars[match], str) and vars[match] is '?'):
+            if match not in vars or (isinstance(vars[match], str) and vars[match] == '?'):
                 vars[match] = False
 
         matches = regex_all_vars.findall(templ_content)
